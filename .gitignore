@@ -1,0 +1,10 @@
+model/**/*.caffemodel
+model/**/*.h5
+model/**/*.npy
+dataset/train2017
+dataset/val2017
+dataset/test2017
+dataset/annotations
+.idea
+__pycache__
+.ipynb_checkpoints
