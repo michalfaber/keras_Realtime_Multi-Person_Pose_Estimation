@@ -39,7 +39,7 @@ which you can use to extract weights data.
 ## Testing steps
 - Convert caffe model to keras model or download already converted keras model https://www.dropbox.com/s/llpxd14is7gyj0z/model.h5
 - Run the notebook `demo.ipynb`.
-- `python demo_image.py --image sample_images\ski.jpg` to run the picture demo. Result will be stored in the file result.png. You can use
+- `python demo_image.py --image sample_images/ski.jpg` to run the picture demo. Result will be stored in the file result.png. You can use
 any image file as an input.
 - `python demo_camera.py` to run the web demo.
 
