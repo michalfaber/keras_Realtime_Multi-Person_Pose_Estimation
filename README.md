@@ -48,8 +48,17 @@ any image file as an input.
 - Download the data set (~25 GB) `cd dataset; sh get_dataset.sh`,
 - Download [COCO official toolbox](https://github.com/pdollar/coco) in `dataset/coco/` . 
 - `cd coco/PythonAPI; sudo python setup.py install` to install pycocotools.
-- Run `cd ../..; python train_pose.py` to start training. 
-
+- Go to the "training" folder `cd ../../../training`.
+- Generate masks `python generate_masks.py`. Note: set the parameter "mode" in generate_masks.py (validation or training) 
+- Create intermediate dataset `python generate_hdf5.py`. This tool creates a dataset in hdf5 format. The structure of this dataset is very similar to the 
+    original lmdb dataset where a sample is represented as an array: 6 x width x height (3 channels for image, 1 channel for metedata, 2 channels for masks)    
+    Note: set the parameters "datasets", "val_size" in generate_hdf5.py         
+- The resulting intermediate hdf5 dataset has to be transformed to the more keras friendly format with data and labels ready to use in python generator.
+  Download and compile the tool [dataset_transformer](https://github.com/michalfaber/rmpe_dataset_transformer). 
+    Use this tool to create final datasets `dataset/train_dataset.h5` `dataset/val_dataset.h5`  
+- You can verify the datasets `inspect_dataset.ipynb` 
+- Start training `python train_pose.py` (TODO) 
+    
 ## Related repository
 - CVPR'16, [Convolutional Pose Machines](https://github.com/shihenw/convolutional-pose-machines-release).
 - CVPR'17, [Realtime Multi-Person Pose Estimation](https://github.com/ZheC/Realtime_Multi-Person_Pose_Estimation).

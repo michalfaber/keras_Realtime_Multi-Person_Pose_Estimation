@@ -4,7 +4,11 @@ model/**/*.npy
 dataset/train2017
 dataset/val2017
 dataset/test2017
+dataset/trainmask2017
+dataset/valmask2017
+dataset/*.h5
 dataset/annotations
+dataset/coco
 .idea
 __pycache__
 .ipynb_checkpoints
