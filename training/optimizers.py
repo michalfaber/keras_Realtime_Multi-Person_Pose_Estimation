@@ -2,10 +2,10 @@ from keras.optimizers import Optimizer
 from keras import backend as K
 from keras.legacy import interfaces
 
-# TODO: Add lr=lr*gamma after stepsize iteration
+
 class MultiSGD(Optimizer):
     """
-    Modified SGD with added support for learning/decay multiplier
+    Modified SGD with added support for learning multiplier for kernels and biases
     as suggested in: https://github.com/fchollet/keras/issues/5920
 
     Stochastic gradient descent optimizer.
@@ -19,7 +19,7 @@ class MultiSGD(Optimizer):
     """
 
     def __init__(self, lr=0.01, momentum=0., decay=0.,
-                 nesterov=False, exception_vars=[], multiplier=0.1, **kwargs):
+                 nesterov=False, lr_mult=None, **kwargs):
         super(MultiSGD, self).__init__(**kwargs)
         with K.name_scope(self.__class__.__name__):
             self.iterations = K.variable(0, dtype='int64', name='iterations')
@@ -28,8 +28,7 @@ class MultiSGD(Optimizer):
             self.decay = K.variable(decay, name='decay')
         self.initial_decay = decay
         self.nesterov = nesterov
-        self.exception_vars = exception_vars
-        self.multiplier = multiplier
+        self.lr_mult = lr_mult
 
     @interfaces.legacy_get_updates_support
     def get_updates(self, loss, params):
@@ -45,7 +44,11 @@ class MultiSGD(Optimizer):
         moments = [K.zeros(shape) for shape in shapes]
         self.weights = [self.iterations] + moments
         for p, g, m in zip(params, grads, moments):
-            multiplied_lr = lr * self.multiplier if p in self.exception_vars else lr
+
+            if p.name in self.lr_mult:
+                multiplied_lr = lr * self.lr_mult[p.name]
+            else:
+                multiplied_lr = lr
 
             v = self.momentum * m - multiplied_lr * g  # velocity
             self.updates.append(K.update(m, v))
