@@ -17,20 +17,22 @@ val_anno_path = os.path.join(dataset_dir, "annotations/person_keypoints_val2017.
 val_img_dir = os.path.join(dataset_dir, "val2017")
 val_mask_dir = os.path.join(dataset_dir, "valmask2017")
 
-# datasets = [
-#     (tr_anno_path, tr_img_dir, tr_mask_dir, "COCO"),
-#     (val_anno_path, val_img_dir, val_mask_dir, "COCO")
-# ]
-
 datasets = [
+    (tr_anno_path, tr_img_dir, tr_mask_dir, "COCO"),
     (val_anno_path, val_img_dir, val_mask_dir, "COCO")
 ]
+
+#datasets = [
+#    (val_anno_path, val_img_dir, val_mask_dir, "COCO")
+#]
 
 joint_all = []
 tr_hdf5_path = os.path.join(dataset_dir, "train_pre_dataset.h5")
 val_hdf5_path = os.path.join(dataset_dir, "val_pre_dataset.h5")
 
 val_size = 2645 # size of validation set
+
+#val_size = 300
 
 def process():
     count = 0
@@ -55,12 +57,8 @@ def process():
 
             print("Image ID ", img_id)
 
-            if i < val_size:
-                isValidation = 1
-            else:
-                isValidation = 0
-
             persons = []
+            prev_center = []
 
             for p in range(numPeople):
 
@@ -76,19 +74,18 @@ def process():
                 person_center = [img_anns[p]["bbox"][0] + img_anns[p]["bbox"][2] / 2,
                                  img_anns[p]["bbox"][1] + img_anns[p]["bbox"][3] / 2]
 
-                # # skip this person if the distance to exiting person is too small
-                # person_center = np.array((img_anns[p]["bbox"][0] + img_anns[p]["bbox"][2] / 2,
-                #                  img_anns[p]["bbox"][1] + img_anns[p]["bbox"][3] / 2))
-                # flag = 0
-                #
-                # for pc in prev_center:
-                #     dist = cdist(np.expand_dims(pc[:2], axis=0), np.expand_dims(person_center, axis=0))[0]
-                #     if dist < pc[2]*0.3:
-                #         flag = 1
-                #         continue
-                #
-                # if flag == 1:
-                #     continue
+                # skip this person if the distance to exiting person is too small
+                flag = 0
+                for pc in prev_center:
+                    a = np.expand_dims(pc[:2], axis=0)
+                    b = np.expand_dims(person_center, axis=0)
+                    dist = cdist(a, b)[0]
+                    if dist < pc[2]*0.3:
+                        flag = 1
+                        continue
+
+                if flag == 1:
+                    continue
 
                 pers["objpos"] = person_center
                 pers["bbox"] = img_anns[p]["bbox"]
@@ -110,12 +107,19 @@ def process():
                 pers["scale_provided"] = img_anns[p]["bbox"][3] / 368
 
                 persons.append(pers)
+                prev_center.append(np.append(person_center, max(img_anns[p]["bbox"][2], img_anns[p]["bbox"][3])))
+
 
             if len(persons) > 0:
 
                 joint_all.append(dict())
 
                 joint_all[count]["dataset"] = dataset_type
+
+                if count < val_size:
+                    isValidation = 1
+                else:
+                    isValidation = 0
 
                 joint_all[count]["isValidation"] = isValidation
 

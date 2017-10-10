@@ -57,7 +57,17 @@ any image file as an input.
   Download and compile the tool [dataset_transformer](https://github.com/michalfaber/rmpe_dataset_transformer). 
     Use this tool to create final datasets `dataset/train_dataset.h5` `dataset/val_dataset.h5`  
 - You can verify the datasets `inspect_dataset.ipynb` 
-- Start training `python train_pose.py` (TODO) 
+- Start training `python train_pose.py` 
+
+NOTE:
+I trained the model from scratch for 3,5 days on a single GPU 1070 but did't obtain satisfactory results.
+38 epochs is about 200000 iterations in caffe. 
+I noticed that reducing learning rate after the step 136106 (as in orginal caffe model) was probably too early
+because learning process slowed down.
+ 
+<div align="center">
+<img src="https://github.com/michalfaber/keras_Realtime_Multi-Person_Pose_Estimation/blob/master/readme/tr_results.png", width="450", height="563">
+</div>
     
 ## Related repository
 - CVPR'16, [Convolutional Pose Machines](https://github.com/shihenw/convolutional-pose-machines-release).

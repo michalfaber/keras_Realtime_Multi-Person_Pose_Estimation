@@ -6,7 +6,7 @@ import numpy as np
 import util
 from config_reader import config_reader
 from scipy.ndimage.filters import gaussian_filter
-from model import get_model
+from model import get_testing_model
 
 
 keras_weights_file = "model/keras/model.h5"
@@ -44,7 +44,7 @@ def process (input_image, params, model_params):
         imageToTest_padded, pad = util.padRightDownCorner(imageToTest, model_params['stride'],
                                                           model_params['padValue'])
 
-        input_img = np.transpose(np.float32(imageToTest_padded[:,:,:,np.newaxis]), (3,0,1,2))/256 - 0.5; # required shape (1, width, height, channels)
+        input_img = np.transpose(np.float32(imageToTest_padded[:,:,:,np.newaxis]), (3,0,1,2)) # required shape (1, width, height, channels)
 
         output_blobs = model.predict(input_img)
 
@@ -238,7 +238,7 @@ if __name__ == '__main__':
     print('start processing...')
 
     # load model
-    model = get_model()
+    model = get_testing_model()
     model.load_weights(keras_weights_file)
 
     # load config
