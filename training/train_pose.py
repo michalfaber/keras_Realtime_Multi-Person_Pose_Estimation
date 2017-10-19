@@ -6,10 +6,10 @@ import math
 sys.path.append("..")
 from model import get_training_model
 from ds_iterator import DataIterator
+from ds_generator_client import DataGeneratorClient
 from optimizers import MultiSGD
 from keras.callbacks import LearningRateScheduler, ModelCheckpoint, CSVLogger, TensorBoard
 from keras.layers.convolutional import Conv2D
-from keras.utils.data_utils import get_file
 from keras.applications.vgg19 import VGG19
 
 batch_size = 10
@@ -21,6 +21,9 @@ gamma = 0.333
 stepsize = 136106 #68053   // after each stepsize iterations update learning rate: lr=lr*gamma
 max_iter = 200000 # 600000
 
+# True = start data generator client, False = use augmented dataset file (deprecated)
+use_client_gen = True
+
 WEIGHTS_BEST = "weights.best.h5"
 TRAINING_LOG = "training.csv"
 LOGS_DIR = "./logs"
@@ -30,7 +33,7 @@ def get_last_epoch():
     return max(data['epoch'].values)
 
 
-model = get_training_model(weight_decay)
+model = get_training_model(weight_decay, vgg_norm=True)
 
 from_vgg = dict()
 from_vgg['conv1_1'] = 'block1_conv1'
@@ -64,15 +67,28 @@ else:
     last_epoch = 0
 
 # prepare generators
-train_di = DataIterator("../dataset/train_dataset.h5", data_shape=(3, 368, 368),
-                  mask_shape=(1, 46, 46),
-                  label_shape=(57, 46, 46),
-                  vec_num=38, heat_num=19, batch_size=batch_size, shuffle=True)
 
-val_di = DataIterator("../dataset/val_dataset.h5", data_shape=(3, 368, 368),
-                  mask_shape=(1, 46, 46),
-                  label_shape=(57, 46, 46),
-                  vec_num=38, heat_num=19, batch_size=batch_size, shuffle=True)
+if use_client_gen:
+    train_client = DataGeneratorClient(port=5555, host="localhost", hwm=160, batch_size=10)
+    train_client.start()
+    train_di = train_client.gen()
+    train_samples = 52597
+
+    val_client = DataGeneratorClient(port=5556, host="localhost", hwm=160, batch_size=10)
+    val_client.start()
+    val_di = val_client.gen()
+    val_samples = 2645
+else:
+    train_di = DataIterator("../dataset/train_dataset.h5", data_shape=(3, 368, 368),
+                      mask_shape=(1, 46, 46),
+                      label_shape=(57, 46, 46),
+                      vec_num=38, heat_num=19, batch_size=batch_size, shuffle=True)
+    train_samples=train_di.N
+    val_di = DataIterator("../dataset/val_dataset.h5", data_shape=(3, 368, 368),
+                      mask_shape=(1, 46, 46),
+                      label_shape=(57, 46, 46),
+                      vec_num=38, heat_num=19, batch_size=batch_size, shuffle=True)
+    val_samples=val_di.N
 
 # setup lr multipliers for conv layers
 lr_mult=dict()
@@ -131,7 +147,7 @@ loss_weights["weight_stage6_L1"] = 1
 loss_weights["weight_stage6_L2"] = 1
 
 # learning rate schedule - equivalent of caffe lr_policy =  "step"
-iterations_per_epoch = train_di.N // batch_size
+iterations_per_epoch = train_samples // batch_size
 def step_decay(epoch):
     initial_lrate = base_lr
     steps = epoch * iterations_per_epoch
@@ -155,12 +171,12 @@ multisgd = MultiSGD(lr=base_lr, momentum=momentum, decay=0.0, nesterov=False, lr
 model.compile(loss=losses, loss_weights=loss_weights, optimizer=multisgd, metrics=["accuracy"])
 
 model.fit_generator(train_di,
-                    steps_per_epoch=train_di.N // batch_size,
+                    steps_per_epoch=train_samples // batch_size,
                     epochs=max_iter,
                     callbacks=callbacks_list,
                     validation_data=val_di,
-                    validation_steps=val_di.N // batch_size,
-                    use_multiprocessing=True,
+                    validation_steps=val_samples // batch_size,
+                    use_multiprocessing=False,
                     initial_epoch=last_epoch
                     )
 

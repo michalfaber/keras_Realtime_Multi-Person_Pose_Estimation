@@ -22,16 +22,15 @@ datasets = [
     (val_anno_path, val_img_dir, val_mask_dir, "COCO")
 ]
 
-#datasets = [
-#    (val_anno_path, val_img_dir, val_mask_dir, "COCO")
-#]
+# datasets = [
+#     (val_anno_path, val_img_dir, val_mask_dir, "COCO")
+# ]
 
 joint_all = []
-tr_hdf5_path = os.path.join(dataset_dir, "train_pre_dataset.h5")
-val_hdf5_path = os.path.join(dataset_dir, "val_pre_dataset.h5")
+tr_hdf5_path = os.path.join(dataset_dir, "train_dataset.h5")
+val_hdf5_path = os.path.join(dataset_dir, "val_dataset.h5")
 
 val_size = 2645 # size of validation set
-
 #val_size = 300
 
 def process():

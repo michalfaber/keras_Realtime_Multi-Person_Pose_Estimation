@@ -44,6 +44,15 @@ any image file as an input.
 - `python demo_camera.py` to run the web demo.
 
 ## Training steps
+**UPDATE 10/2017:**
+
+**-Augmented samples are fetched from the [server](https://github.com/michalfaber/rmpe_dataset_server). The network never sees the same image twice
+  which was a problem in previous approach (tool rmpe_dataset_transformer)
+  This allows you to run augmentation locally or on separate node. 
+  You can start 2 instances, one serving training set and a second one serving validation set (on different port if locally)** 
+  
+**-Experimentally I've added image normalization as in vgg paper (images should be zero-centered by mean pixel subtraction)**
+
 - Install gsutil `curl https://sdk.cloud.google.com | bash`. This is a really helpful tool for downloading large datasets. 
 - Download the data set (~25 GB) `cd dataset; sh get_dataset.sh`,
 - Download [COCO official toolbox](https://github.com/pdollar/coco) in `dataset/coco/` . 
@@ -51,13 +60,19 @@ any image file as an input.
 - Go to the "training" folder `cd ../../../training`.
 - Generate masks `python generate_masks.py`. Note: set the parameter "mode" in generate_masks.py (validation or training) 
 - Create intermediate dataset `python generate_hdf5.py`. This tool creates a dataset in hdf5 format. The structure of this dataset is very similar to the 
-    original lmdb dataset where a sample is represented as an array: 6 x width x height (3 channels for image, 1 channel for metedata, 2 channels for masks)    
-    Note: set the parameters "datasets", "val_size" in generate_hdf5.py         
-- The resulting intermediate hdf5 dataset has to be transformed to the more keras friendly format with data and labels ready to use in python generator.
-  Download and compile the tool [dataset_transformer](https://github.com/michalfaber/rmpe_dataset_transformer). 
-    Use this tool to create final datasets `dataset/train_dataset.h5` `dataset/val_dataset.h5`  
-- You can verify the datasets `inspect_dataset.ipynb` 
-- Start training `python train_pose.py` 
+    original lmdb dataset where a sample is represented as an array: 5 x width x height (3 channels for image, 1 channel for metedata, 1 channel for miss masks)
+    For MPI dataset there are 6 channels with additional all masks.
+    Note: set the parameters `datasets` and `val_size` in `generate_hdf5.py`
+- Download and compile the dataset server [rmpe_dataset_server](https://github.com/michalfaber/rmpe_dataset_server).
+  This server generates augmented samples on the fly. Source samples are retrieved from previously generated hdf5 dataset file.                           
+- Start training data server in the first terminal session. 
+    `./rmpe_dataset_server ../../keras_Realtime_Multi-Person_Pose_Estimation/dataset/train_dataset.h5 5555`
+- Start validation data server in a second terminal session.
+    `./rmpe_dataset_server ../../keras_Realtime_Multi-Person_Pose_Estimation/dataset/val_dataset.h5 5556`
+- Optionally you can verify the datasets `inspect_dataset.ipynb`
+- Set the correct number of samples within `python train_pose.py` - variables "train_samples = ???" and "val_samples = ???".  
+ This number is used by keras to determine how many samples are in 1 epoch.
+- Train the model in a third terminal `python train_pose.py`
 
 NOTE:
 I trained the model from scratch for 3,5 days on a single GPU 1070 but did't obtain satisfactory results.

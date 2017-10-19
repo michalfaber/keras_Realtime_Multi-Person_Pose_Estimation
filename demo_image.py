@@ -238,7 +238,10 @@ if __name__ == '__main__':
     print('start processing...')
 
     # load model
-    model = get_testing_model()
+
+    # authors of original model don't use
+    # vgg normalization (subtracting mean) on input images
+    model = get_testing_model(vgg_norm=False)
     model.load_weights(keras_weights_file)
 
     # load config
@@ -251,6 +254,8 @@ if __name__ == '__main__':
     print ('processing time is %.5f' % (toc - tic))
 
     cv2.imwrite(output, canvas)
+
+    cv2.destroyAllWindows()
 
 
 

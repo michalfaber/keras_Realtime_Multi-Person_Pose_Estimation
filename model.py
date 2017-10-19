@@ -6,6 +6,7 @@ from keras.layers.pooling import MaxPooling2D
 from keras.layers.merge import Multiply
 from keras.regularizers import l2
 from keras.initializers import random_normal,constant
+import numpy as np
 
 def relu(x): return Activation('relu')(x)
 
@@ -109,7 +110,7 @@ def apply_mask(x, mask1, mask2, num_p, stage, branch):
     return w
 
 
-def get_training_model(weight_decay):
+def get_training_model(weight_decay, vgg_norm):
 
     stages = 6
     np_branch1 = 38
@@ -130,7 +131,11 @@ def get_training_model(weight_decay):
     inputs.append(vec_weight_input)
     inputs.append(heat_weight_input)
 
-    img_normalized = Lambda(lambda x: x / 256 - 0.5)(img_input)
+    if vgg_norm:
+        vgg_mean = np.array([103.939, 116.779, 123.68])  # BGR
+        img_normalized = Lambda(lambda x: x - vgg_mean)(img_input)
+    else:
+        img_normalized = Lambda(lambda x: x / 256 - 0.5)(img_input) # [-0.5, 0.5]
 
     # VGG
     stage0_out = vgg_block(img_normalized, weight_decay)
@@ -169,7 +174,7 @@ def get_training_model(weight_decay):
     return model
 
 
-def get_testing_model():
+def get_testing_model(vgg_norm=False):
     stages = 6
     np_branch1 = 38
     np_branch2 = 19
@@ -178,7 +183,11 @@ def get_testing_model():
 
     img_input = Input(shape=img_input_shape)
 
-    img_normalized = Lambda(lambda x: x / 256 - 0.5)(img_input) # [-0.5, 0.5]
+    if vgg_norm:
+        vgg_mean = np.array([103.939, 116.779, 123.68])  # BGR
+        img_normalized = Lambda(lambda x: x - vgg_mean)(img_input)
+    else:
+        img_normalized = Lambda(lambda x: x / 256 - 0.5)(img_input) # [-0.5, 0.5]
 
     # VGG
     stage0_out = vgg_block(img_normalized, None)
