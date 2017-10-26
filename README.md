@@ -58,7 +58,7 @@ any image file as an input.
 **Results of running `demo_image --image sample_images/ski.jpg --model training/weights.best.h5` with weights trained only 25000 iterations. Not too bad !!! Training on my single 1070 GPU took around 10 hours.**
 
 <p align="center">
-<img src="https://github.com/michalfaber/keras_Realtime_Multi-Person_Pose_Estimation/blob/master/readme/5ep_result.png", width="700">
+<img src="https://github.com/michalfaber/keras_Realtime_Multi-Person_Pose_Estimation/blob/master/readme/5ep_result.png", width="300">
 </p>
 
 **UPDATE 22/10/2017:**
