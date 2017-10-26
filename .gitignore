@@ -12,3 +12,6 @@ dataset/coco
 .idea
 __pycache__
 .ipynb_checkpoints
+logs/
+training.csv
+weights.best.h5

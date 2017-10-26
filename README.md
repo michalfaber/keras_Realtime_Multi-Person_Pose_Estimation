@@ -44,15 +44,30 @@ any image file as an input.
 - `python demo_camera.py` to run the web demo.
 
 ## Training steps
-**UPDATE 10/2017:**
 
-**-Augmented samples are fetched from the [server](https://github.com/michalfaber/rmpe_dataset_server). The network never sees the same image twice
+**UPDATE 26/10/2017**
+
+**Fixed problem with the training procedure. 
+ Here are my results after training for 5 epochs = 25000 iterations (1 epoch is ~5000 batches)
+ The loss values are quite similar as in the original training - [output.txt](https://github.com/ZheC/Realtime_Multi-Person_Pose_Estimation/blob/master/training/example_loss/output.txt)**
+   
+<p align="center">
+<img src="https://github.com/michalfaber/keras_Realtime_Multi-Person_Pose_Estimation/blob/master/readme/losses.png", width="700">
+</p>
+
+**Results of running `demo_image --image sample_images/ski.jpg --model training/weights.best.h5` with weights trained only 25000 iterations. Not too bad !!! Training on my single 1070 GPU took around 10 hours.**
+
+<p align="center">
+<img src="https://github.com/michalfaber/keras_Realtime_Multi-Person_Pose_Estimation/blob/master/readme/5ep_result.png", width="700">
+</p>
+
+**UPDATE 22/10/2017:**
+
+**Augmented samples are fetched from the [server](https://github.com/michalfaber/rmpe_dataset_server). The network never sees the same image twice
   which was a problem in previous approach (tool rmpe_dataset_transformer)
   This allows you to run augmentation locally or on separate node. 
   You can start 2 instances, one serving training set and a second one serving validation set (on different port if locally)** 
   
-**-Experimentally I've added image normalization as in vgg paper (images should be zero-centered by mean pixel subtraction)**
-
 - Install gsutil `curl https://sdk.cloud.google.com | bash`. This is a really helpful tool for downloading large datasets. 
 - Download the data set (~25 GB) `cd dataset; sh get_dataset.sh`,
 - Download [COCO official toolbox](https://github.com/pdollar/coco) in `dataset/coco/` . 
@@ -73,16 +88,6 @@ any image file as an input.
 - Set the correct number of samples within `python train_pose.py` - variables "train_samples = ???" and "val_samples = ???".  
  This number is used by keras to determine how many samples are in 1 epoch.
 - Train the model in a third terminal `python train_pose.py`
-
-NOTE:
-I trained the model from scratch for 3,5 days on a single GPU 1070 but did't obtain satisfactory results.
-38 epochs is about 200000 iterations in caffe. 
-I noticed that reducing learning rate after the step 136106 (as in orginal caffe model) was probably too early
-because learning process slowed down.
- 
-<div align="center">
-<img src="https://github.com/michalfaber/keras_Realtime_Multi-Person_Pose_Estimation/blob/master/readme/tr_results.png", width="450", height="563">
-</div>
     
 ## Related repository
 - CVPR'16, [Convolutional Pose Machines](https://github.com/shihenw/convolutional-pose-machines-release).

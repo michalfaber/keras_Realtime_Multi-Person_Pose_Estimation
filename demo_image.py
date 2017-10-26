@@ -9,8 +9,6 @@ from scipy.ndimage.filters import gaussian_filter
 from model import get_testing_model
 
 
-keras_weights_file = "model/keras/model.h5"
-
 # find connection in the specified sequence, center 29 is in the position 15
 limbSeq = [[2, 3], [2, 6], [3, 4], [4, 5], [6, 7], [7, 8], [2, 9], [9, 10], \
            [10, 11], [2, 12], [12, 13], [13, 14], [2, 1], [1, 15], [15, 17], \
@@ -229,10 +227,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--image', type=str, required=True, help='input image')
     parser.add_argument('--output', type=str, default='result.png', help='output image')
+    parser.add_argument('--model', type=str, default='model/keras/model.h5', help='path to the weights file')
 
     args = parser.parse_args()
     input_image = args.image
     output = args.output
+    keras_weights_file = args.model
 
     tic = time.time()
     print('start processing...')
@@ -241,7 +241,7 @@ if __name__ == '__main__':
 
     # authors of original model don't use
     # vgg normalization (subtracting mean) on input images
-    model = get_testing_model(vgg_norm=False)
+    model = get_testing_model()
     model.load_weights(keras_weights_file)
 
     # load config

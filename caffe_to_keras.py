@@ -1,11 +1,11 @@
-from model import get_model
+from model import get_testing_model
 import numpy as np
 import os
 
 CAFFE_LAYERS_DIR = "model/caffe/layers"
 KERAS_MODEL_FILE = "model/keras/model.h5"
 
-m = get_model()
+m = get_testing_model()
 
 for layer in m.layers:
     layer_name = layer.name
