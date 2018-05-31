@@ -17,7 +17,7 @@ def config_reader():
     param['use_gpu'] = int(param['use_gpu'])
     param['starting_range'] = float(param['starting_range'])
     param['ending_range'] = float(param['ending_range'])
-    param['scale_search'] = map(float, param['scale_search'])
+    param['scale_search'] = list(map(float, param['scale_search']))
     param['thre1'] = float(param['thre1'])
     param['thre2'] = float(param['thre2'])
     param['thre3'] = float(param['thre3'])
