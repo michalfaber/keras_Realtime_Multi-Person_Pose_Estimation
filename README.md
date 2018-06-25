@@ -4,6 +4,12 @@ This is a keras version of [Realtime Multi-Person Pose Estimation](https://githu
 ## Introduction
 Code repo for reproducing [2017 CVPR](https://arxiv.org/abs/1611.08050) paper using keras.  
 
+This is a new improved version. The main objective was to remove
+dependency on separate c++ server which besides the complexity
+of compiling also contained some bugs... and was very slow.
+The old version utilizing [rmpe_dataset_server](https://github.com/michalfaber/rmpe_dataset_server) is
+still available under the tag [v0.1](https://github.com/michalfaber/keras_Realtime_Multi-Person_Pose_Estimation/releases/tag/v0.1) if you really would like to take a look.
+
 ## Results
 
 <p align="center">
@@ -21,6 +27,7 @@ Code repo for reproducing [2017 CVPR](https://arxiv.org/abs/1611.08050) paper us
 1. [Converting caffe model](#converting-caffe-model-to-keras-model)
 2. [Testing](#testing-steps)
 3. [Training](#training-steps)
+3. [Changes](#changes)
 
 ## Require
 1. [Keras](https://keras.io/)
@@ -41,54 +48,63 @@ which you can use to extract weights data.
 - Run the notebook `demo.ipynb`.
 - `python demo_image.py --image sample_images/ski.jpg` to run the picture demo. Result will be stored in the file result.png. You can use
 any image file as an input.
-- `python demo_camera.py` to run the web demo.
 
 ## Training steps
 
-**UPDATE 26/10/2017**
 
-**Fixed problem with the training procedure. 
- Here are my results after training for 5 epochs = 25000 iterations (1 epoch is ~5000 batches)
- The loss values are quite similar as in the original training - [output.txt](https://github.com/ZheC/Realtime_Multi-Person_Pose_Estimation/blob/master/training/example_loss/output.txt)**
-   
-<p align="center">
-<img src="https://github.com/michalfaber/keras_Realtime_Multi-Person_Pose_Estimation/blob/master/readme/losses.png", width="700">
-</p>
-
-**Results of running `demo_image --image sample_images/ski.jpg --model training/weights.best.h5` with model trained only 25000 iterations. Not too bad !!! Training on my single 1070 GPU took around 10 hours.**
-
-<p align="center">
-<img src="https://github.com/michalfaber/keras_Realtime_Multi-Person_Pose_Estimation/blob/master/readme/5ep_result.png", width="300">
-</p>
-
-**UPDATE 22/10/2017:**
-
-**Augmented samples are fetched from the [server](https://github.com/michalfaber/rmpe_dataset_server). The network never sees the same image twice
-  which was a problem in previous approach (tool rmpe_dataset_transformer)
-  This allows you to run augmentation locally or on separate node. 
-  You can start 2 instances, one serving training set and a second one serving validation set (on different port if locally)** 
-  
 - Install gsutil `curl https://sdk.cloud.google.com | bash`. This is a really helpful tool for downloading large datasets. 
 - Download the data set (~25 GB) `cd dataset; sh get_dataset.sh`,
 - Download [COCO official toolbox](https://github.com/pdollar/coco) in `dataset/coco/` . 
 - `cd coco/PythonAPI; sudo python setup.py install` to install pycocotools.
 - Go to the "training" folder `cd ../../../training`.
-- Generate masks `python generate_masks.py`. Note: set the parameter "mode" in generate_masks.py (validation or training) 
-- Create intermediate dataset `python generate_hdf5.py`. This tool creates a dataset in hdf5 format. The structure of this dataset is very similar to the 
-    original lmdb dataset where a sample is represented as an array: 5 x width x height (3 channels for image, 1 channel for metedata, 1 channel for miss masks)
-    For MPI dataset there are 6 channels with additional all masks.
-    Note: set the parameters `datasets` and `val_size` in `generate_hdf5.py`
-- Download and compile the dataset server [rmpe_dataset_server](https://github.com/michalfaber/rmpe_dataset_server).
-  This server generates augmented samples on the fly. Source samples are retrieved from previously generated hdf5 dataset file.                           
-- Start training data server in the first terminal session. 
-    `./rmpe_dataset_server ../../keras_Realtime_Multi-Person_Pose_Estimation/dataset/train_dataset.h5 5555`
-- Start validation data server in a second terminal session.
-    `./rmpe_dataset_server ../../keras_Realtime_Multi-Person_Pose_Estimation/dataset/val_dataset.h5 5556`
-- Optionally you can verify the datasets `inspect_dataset.ipynb`
-- Set the correct number of samples within `python train_pose.py` - variables "train_samples = ???" and "val_samples = ???".  
- This number is used by keras to determine how many samples are in 1 epoch.
-- Train the model in a third terminal `python train_pose.py`
-    
+- Optionally, you can set the number of processes used to generate samples in parallel
+  `dataset.py` -> find the line `df = PrefetchDataZMQ(df, nr_proc=4)`
+- Run the command in terminal `python train_pose.py`
+
+## Changes
+**25/06/2018**
+
+- Performance improvement thanks to replacing c++ server rmpe_dataset_server
+with [tensorpack dataflow](http://tensorpack.readthedocs.io/tutorial/dataflow.html).
+Tensorpack is a very efficient library for preprocessing and data loading for tensorflow models.
+Dataflow object behaves like a normal Python iterator but it can generate samples using many processes.
+This significantly reduces latency when GPU waits for
+the next sample to be processed.
+
+- Masks generated on the fly - no need to run separate scripts to generate masks.
+In fact most of the mask were only positive (nothing to mask out)
+
+- Masking out the discarded persons who are too close to the main person in the
+picture, so that the network never sees unlabelled people. Previously we filtered out
+keypoints of such smaller persons but they were still visible in the picture.
+
+- Incorrect handling of masks has been fixed. The rmpe_dataset_server
+sometimes assigned a wrong mask to the image, misleading the network.
+
+
+**26/10/2017**
+
+Fixed problem with the training procedure.
+ Here are my results after training for 5 epochs = 25000 iterations (1 epoch is ~5000 batches)
+ The loss values are quite similar as in the original training - [output.txt](https://github.com/ZheC/Realtime_Multi-Person_Pose_Estimation/blob/master/training/example_loss/output.txt)
+
+<p align="center">
+<img src="https://github.com/michalfaber/keras_Realtime_Multi-Person_Pose_Estimation/blob/master/readme/losses.png", width="700">
+</p>
+
+Results of running `demo_image --image sample_images/ski.jpg --model training/weights.best.h5` with model trained only 25000 iterations. Not too bad !!! Training on my single 1070 GPU took around 10 hours.
+
+<p align="center">
+<img src="https://github.com/michalfaber/keras_Realtime_Multi-Person_Pose_Estimation/blob/master/readme/5ep_result.png", width="300">
+</p>
+
+**22/10/2017**
+
+Augmented samples are fetched from the [server](https://github.com/michalfaber/rmpe_dataset_server). The network never sees the same image twice
+  which was a problem in previous approach (tool rmpe_dataset_transformer)
+  This allows you to run augmentation locally or on separate node.
+  You can start 2 instances, one serving training set and a second one serving validation set (on different port if locally)
+
 ## Related repository
 - CVPR'16, [Convolutional Pose Machines](https://github.com/shihenw/convolutional-pose-machines-release).
 - CVPR'17, [Realtime Multi-Person Pose Estimation](https://github.com/ZheC/Realtime_Multi-Person_Pose_Estimation).

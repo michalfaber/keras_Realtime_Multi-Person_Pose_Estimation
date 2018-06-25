@@ -1,17 +1,21 @@
-import sys
-import os
-import pandas
-import re
 import math
-sys.path.append("..")
-from model import get_training_model
-from ds_iterator import DataIterator
-from ds_generator_client import DataGeneratorClient
-from optimizers import MultiSGD
+import os
+import re
+import sys
+import pandas
+from functools import partial
+
+import keras.backend as K
+from keras.applications.vgg19 import VGG19
 from keras.callbacks import LearningRateScheduler, ModelCheckpoint, CSVLogger, TensorBoard
 from keras.layers.convolutional import Conv2D
-from keras.applications.vgg19 import VGG19
-import keras.backend as K
+
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+
+from model.cmu_model import get_training_model
+from training.optimizers import MultiSGD
+from training.dataset import get_dataflow
+
 
 batch_size = 10
 base_lr = 4e-5 # 2e-5
@@ -22,125 +26,133 @@ gamma = 0.333
 stepsize = 136106 #68053   // after each stepsize iterations update learning rate: lr=lr*gamma
 max_iter = 200000 # 600000
 
-# True = start data generator client, False = use augmented dataset file (deprecated)
-use_client_gen = True
+weights_best_file = "weights.best.h5"
+training_log = "training.csv"
+logs_dir = "./logs"
 
-WEIGHTS_BEST = "weights.best.h5"
-TRAINING_LOG = "training.csv"
-LOGS_DIR = "./logs"
+from_vgg = {
+    'conv1_1': 'block1_conv1',
+    'conv1_2': 'block1_conv2',
+    'conv2_1': 'block2_conv1',
+    'conv2_2': 'block2_conv2',
+    'conv3_1': 'block3_conv1',
+    'conv3_2': 'block3_conv2',
+    'conv3_3': 'block3_conv3',
+    'conv3_4': 'block3_conv4',
+    'conv4_1': 'block4_conv1',
+    'conv4_2': 'block4_conv2'
+}
+
 
 def get_last_epoch():
-    data = pandas.read_csv(TRAINING_LOG)
+    """
+    Retrieves last epoch from log file updated during training.
+
+    :return: epoch number
+    """
+    data = pandas.read_csv(training_log)
     return max(data['epoch'].values)
 
 
-model = get_training_model(weight_decay)
+def restore_weights(weights_best_file, model):
+    """
+    Restores weights from the checkpoint file if exists or
+    preloads the first layers with VGG19 weights
 
-from_vgg = dict()
-from_vgg['conv1_1'] = 'block1_conv1'
-from_vgg['conv1_2'] = 'block1_conv2'
-from_vgg['conv2_1'] = 'block2_conv1'
-from_vgg['conv2_2'] = 'block2_conv2'
-from_vgg['conv3_1'] = 'block3_conv1'
-from_vgg['conv3_2'] = 'block3_conv2'
-from_vgg['conv3_3'] = 'block3_conv3'
-from_vgg['conv3_4'] = 'block3_conv4'
-from_vgg['conv4_1'] = 'block4_conv1'
-from_vgg['conv4_2'] = 'block4_conv2'
+    :param weights_best_file:
+    :return: epoch number to use to continue training. last epoch + 1 or 0
+    """
+    # load previous weights or vgg19 if this is the first run
+    if os.path.exists(weights_best_file):
+        print("Loading the best weights...")
 
-# load previous weights or vgg19 if this is the first run
-if os.path.exists(WEIGHTS_BEST):
-    print("Loading the best weights...")
+        model.load_weights(weights_best_file)
 
-    model.load_weights(WEIGHTS_BEST)
-    last_epoch = get_last_epoch() + 1
-else:
-    print("Loading vgg19 weights...")
+        return get_last_epoch() + 1
+    else:
+        print("Loading vgg19 weights...")
 
-    vgg_model = VGG19(include_top=False, weights='imagenet')
+        vgg_model = VGG19(include_top=False, weights='imagenet')
 
+        for layer in model.layers:
+            if layer.name in from_vgg:
+                vgg_layer_name = from_vgg[layer.name]
+                layer.set_weights(vgg_model.get_layer(vgg_layer_name).get_weights())
+                print("Loaded VGG19 layer: " + vgg_layer_name)
+
+        return 0
+
+
+def get_lr_multipliers(model):
+    """
+    Setup multipliers for stageN layers (kernel and bias)
+
+    :param model:
+    :return: dictionary key: layer name , value: multiplier
+    """
+    lr_mult = dict()
     for layer in model.layers:
-        if layer.name in from_vgg:
-            vgg_layer_name = from_vgg[layer.name]
-            layer.set_weights(vgg_model.get_layer(vgg_layer_name).get_weights())
-            print("Loaded VGG19 layer: " + vgg_layer_name)
 
-    last_epoch = 0
+        if isinstance(layer, Conv2D):
 
-# prepare generators
+            # stage = 1
+            if re.match("Mconv\d_stage1.*", layer.name):
+                kernel_name = layer.weights[0].name
+                bias_name = layer.weights[1].name
+                lr_mult[kernel_name] = 1
+                lr_mult[bias_name] = 2
 
-if use_client_gen:
-    train_client = DataGeneratorClient(port=5555, host="localhost", hwm=160, batch_size=10)
-    train_client.start()
-    train_di = train_client.gen()
-    train_samples = 52597
+            # stage > 1
+            elif re.match("Mconv\d_stage.*", layer.name):
+                kernel_name = layer.weights[0].name
+                bias_name = layer.weights[1].name
+                lr_mult[kernel_name] = 4
+                lr_mult[bias_name] = 8
 
-    val_client = DataGeneratorClient(port=5556, host="localhost", hwm=160, batch_size=10)
-    val_client.start()
-    val_di = val_client.gen()
-    val_samples = 2645
-else:
-    train_di = DataIterator("../dataset/train_dataset.h5", data_shape=(3, 368, 368),
-                      mask_shape=(1, 46, 46),
-                      label_shape=(57, 46, 46),
-                      vec_num=38, heat_num=19, batch_size=batch_size, shuffle=True)
-    train_samples=train_di.N
-    val_di = DataIterator("../dataset/val_dataset.h5", data_shape=(3, 368, 368),
-                      mask_shape=(1, 46, 46),
-                      label_shape=(57, 46, 46),
-                      vec_num=38, heat_num=19, batch_size=batch_size, shuffle=True)
-    val_samples=val_di.N
+            # vgg
+            else:
+                kernel_name = layer.weights[0].name
+                bias_name = layer.weights[1].name
+                lr_mult[kernel_name] = 1
+                lr_mult[bias_name] = 2
 
-# setup lr multipliers for conv layers
-lr_mult=dict()
-for layer in model.layers:
+    return lr_mult
 
-    if isinstance(layer, Conv2D):
 
-        # stage = 1
-        if re.match("Mconv\d_stage1.*", layer.name):
-            kernel_name = layer.weights[0].name
-            bias_name = layer.weights[1].name
-            lr_mult[kernel_name] = 1
-            lr_mult[bias_name] = 2
+def get_loss_funcs():
+    """
+    Euclidean loss as implemented in caffe
+    https://github.com/BVLC/caffe/blob/master/src/caffe/layers/euclidean_loss_layer.cpp
+    :return:
+    """
+    def _eucl_loss(x, y):
+        return K.sum(K.square(x - y)) / batch_size / 2
 
-        # stage > 1
-        elif re.match("Mconv\d_stage.*", layer.name):
-            kernel_name = layer.weights[0].name
-            bias_name = layer.weights[1].name
-            lr_mult[kernel_name] = 4
-            lr_mult[bias_name] = 8
+    losses = {}
+    losses["weight_stage1_L1"] = _eucl_loss
+    losses["weight_stage1_L2"] = _eucl_loss
+    losses["weight_stage2_L1"] = _eucl_loss
+    losses["weight_stage2_L2"] = _eucl_loss
+    losses["weight_stage3_L1"] = _eucl_loss
+    losses["weight_stage3_L2"] = _eucl_loss
+    losses["weight_stage4_L1"] = _eucl_loss
+    losses["weight_stage4_L2"] = _eucl_loss
+    losses["weight_stage5_L1"] = _eucl_loss
+    losses["weight_stage5_L2"] = _eucl_loss
+    losses["weight_stage6_L1"] = _eucl_loss
+    losses["weight_stage6_L2"] = _eucl_loss
 
-        # vgg
-        else:
-           kernel_name = layer.weights[0].name
-           bias_name = layer.weights[1].name
-           lr_mult[kernel_name] = 1
-           lr_mult[bias_name] = 2
+    return losses
 
-# configure loss functions
 
-# euclidean loss as implemented in caffe https://github.com/BVLC/caffe/blob/master/src/caffe/layers/euclidean_loss_layer.cpp
-def eucl_loss(x, y):
-    return K.sum(K.square(x - y)) / batch_size / 2
+def step_decay(epoch, iterations_per_epoch):
+    """
+    Learning rate schedule - equivalent of caffe lr_policy =  "step"
 
-losses = {}
-losses["weight_stage1_L1"] = eucl_loss
-losses["weight_stage1_L2"] = eucl_loss
-losses["weight_stage2_L1"] = eucl_loss
-losses["weight_stage2_L2"] = eucl_loss
-losses["weight_stage3_L1"] = eucl_loss
-losses["weight_stage3_L2"] = eucl_loss
-losses["weight_stage4_L1"] = eucl_loss
-losses["weight_stage4_L2"] = eucl_loss
-losses["weight_stage5_L1"] = eucl_loss
-losses["weight_stage5_L2"] = eucl_loss
-losses["weight_stage6_L1"] = eucl_loss
-losses["weight_stage6_L2"] = eucl_loss
-
-# learning rate schedule - equivalent of caffe lr_policy =  "step"
-iterations_per_epoch = train_samples // batch_size
-def step_decay(epoch):
+    :param epoch:
+    :param iterations_per_epoch:
+    :return:
+    """
     initial_lrate = base_lr
     steps = epoch * iterations_per_epoch
 
@@ -148,27 +160,63 @@ def step_decay(epoch):
 
     return lrate
 
-# configure callbacks
-lrate = LearningRateScheduler(step_decay)
-checkpoint = ModelCheckpoint(WEIGHTS_BEST, monitor='loss', verbose=0, save_best_only=False, save_weights_only=True, mode='min', period=1)
-csv_logger = CSVLogger(TRAINING_LOG, append=True)
-tb = TensorBoard(log_dir=LOGS_DIR, histogram_freq=0, write_graph=True, write_images=False)
 
-callbacks_list = [lrate, checkpoint, csv_logger, tb]
+if __name__ == '__main__':
 
-# sgd optimizer with lr multipliers
-multisgd = MultiSGD(lr=base_lr, momentum=momentum, decay=0.0, nesterov=False, lr_mult=lr_mult)
+    # get the model
 
-# start training
-model.compile(loss=losses, optimizer=multisgd, metrics=["accuracy"])
+    model = get_training_model(weight_decay)
 
-model.fit_generator(train_di,
-                    steps_per_epoch=train_samples // batch_size,
-                    epochs=max_iter,
-                    callbacks=callbacks_list,
-                    #validation_data=val_di,
-                    #validation_steps=val_samples // batch_size,
-                    use_multiprocessing=False,
-                    initial_epoch=last_epoch
-                    )
+    # restore weights
 
+    last_epoch = restore_weights(weights_best_file, model)
+
+    # prepare generators
+
+    curr_dir = os.path.dirname(__file__)
+    annot_path = os.path.join(curr_dir, '../dataset/annotations/person_keypoints_train2017.json')
+    img_dir = os.path.abspath(os.path.join(curr_dir, '../dataset/train2017/'))
+    df = get_dataflow(
+        annot_path=annot_path,
+        img_dir=img_dir,
+        batch_size=batch_size)
+    train_gen = df.get_data()
+    train_samples = df.size()
+
+    # setup lr multipliers for conv layers
+
+    lr_multipliers = get_lr_multipliers(model)
+
+    # configure callbacks
+
+    iterations_per_epoch = train_samples // batch_size
+    _step_decay = partial(step_decay,
+                          iterations_per_epoch=iterations_per_epoch
+                          )
+    lrate = LearningRateScheduler(_step_decay)
+    checkpoint = ModelCheckpoint(weights_best_file, monitor='loss',
+                                 verbose=0, save_best_only=False,
+                                 save_weights_only=True, mode='min', period=1)
+    csv_logger = CSVLogger(training_log, append=True)
+    tb = TensorBoard(log_dir=logs_dir, histogram_freq=0, write_graph=True,
+                     write_images=False)
+
+    callbacks_list = [lrate, checkpoint, csv_logger, tb]
+
+    # sgd optimizer with lr multipliers
+
+    multisgd = MultiSGD(lr=base_lr, momentum=momentum, decay=0.0,
+                        nesterov=False, lr_mult=lr_multipliers)
+
+    # start training
+
+    loss_funcs = get_loss_funcs()
+    model.compile(loss=loss_funcs, optimizer=multisgd, metrics=["accuracy"])
+    model.fit_generator(train_gen,
+                        steps_per_epoch=train_samples // batch_size,
+                        epochs=max_iter,
+                        callbacks=callbacks_list,
+                        # validation_data=val_di,
+                        # validation_steps=val_samples // batch_size,
+                        use_multiprocessing=False,
+                        initial_epoch=last_epoch)

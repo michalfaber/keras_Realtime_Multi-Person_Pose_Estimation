@@ -1,3 +1,5 @@
+import os
+import sys
 import argparse
 import cv2
 import math
@@ -6,7 +8,10 @@ import numpy as np
 import util
 from config_reader import config_reader
 from scipy.ndimage.filters import gaussian_filter
-from model import get_testing_model
+
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+
+from model.cmu_model import get_testing_model
 
 
 # find connection in the specified sequence, center 29 is in the position 15
@@ -225,6 +230,7 @@ def process (input_image, params, model_params):
             canvas = cv2.addWeighted(canvas, 0.4, cur_canvas, 0.6, 0)
 
     return canvas
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
