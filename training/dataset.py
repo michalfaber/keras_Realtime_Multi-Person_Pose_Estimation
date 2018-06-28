@@ -175,14 +175,13 @@ def build_sample(components):
     return [image, mask_paf, mask_heatmap, pafmap, heatmap]
 
 
-def get_dataflow(annot_path, img_dir, batch_size):
+def get_dataflow(annot_path, img_dir):
     """
     This function initializes the tensorpack dataflow and serves generator
     for training operation.
 
     :param annot_path: path to the annotation file
     :param img_dir: path to the images
-    :param batch_size: batch size
     :return: dataflow object
     """
     df = CocoDataFlow((368, 368), annot_path, img_dir)
@@ -193,13 +192,24 @@ def get_dataflow(annot_path, img_dir, batch_size):
     df = MapData(df, apply_mask)
     df = MapData(df, build_sample)
     df = PrefetchDataZMQ(df, nr_proc=4) #df = PrefetchData(df, 2, 1)
+
+    return df
+
+
+def batch_dataflow(df, batch_size):
+    """
+    The function builds batch dataflow from the input dataflow of samples
+
+    :param df: dataflow of samples
+    :param batch_size: batch size
+    :return: dataflow of batches
+    """
     df = BatchData(df, batch_size, use_list=False)
     df = MapData(df, lambda x: (
         [x[0], x[1], x[2]],
         [x[3], x[4], x[3], x[4], x[3], x[4], x[3], x[4], x[3], x[4], x[3], x[4]])
-    )
+                 )
     df.reset_state()
-
     return df
 
 

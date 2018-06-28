@@ -14,7 +14,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from model.cmu_model import get_training_model
 from training.optimizers import MultiSGD
-from training.dataset import get_dataflow
+from training.dataset import get_dataflow, batch_dataflow
 
 
 batch_size = 10
@@ -176,12 +176,18 @@ if __name__ == '__main__':
     curr_dir = os.path.dirname(__file__)
     annot_path = os.path.join(curr_dir, '../dataset/annotations/person_keypoints_train2017.json')
     img_dir = os.path.abspath(os.path.join(curr_dir, '../dataset/train2017/'))
+
+    # get dataflow of samples
+
     df = get_dataflow(
         annot_path=annot_path,
-        img_dir=img_dir,
-        batch_size=batch_size)
-    train_gen = df.get_data()
+        img_dir=img_dir)
     train_samples = df.size()
+
+    # get generator of batches
+
+    batch_df = batch_dataflow(df, batch_size)
+    train_gen = batch_df.get_data()
 
     # setup lr multipliers for conv layers
 
