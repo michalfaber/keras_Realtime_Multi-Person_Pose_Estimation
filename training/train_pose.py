@@ -161,6 +161,16 @@ def step_decay(epoch, iterations_per_epoch):
     return lrate
 
 
+def gen(df):
+    """
+    Wrapper around generator. Keras fit_generator requires looping generator.
+    :param df: dataflow instance
+    """
+    while True:
+        for i in df.get_data():
+            yield i
+
+
 if __name__ == '__main__':
 
     # get the model
@@ -187,7 +197,7 @@ if __name__ == '__main__':
     # get generator of batches
 
     batch_df = batch_dataflow(df, batch_size)
-    train_gen = batch_df.get_data()
+    train_gen = gen(batch_df)
 
     # setup lr multipliers for conv layers
 
