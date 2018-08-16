@@ -20,7 +20,7 @@ def create_heatmap(num_maps, height, width, all_joints, sigma, stride):
             relate to the original image size
     :return: heat maps (height x width x num_maps)
     """
-    heatmap = np.zeros((height, width, num_maps), dtype=np.float32)
+    heatmap = np.zeros((height, width, num_maps), dtype=np.float64)
 
     for joints in all_joints:
         for plane_idx, joint in enumerate(joints):
@@ -30,7 +30,7 @@ def create_heatmap(num_maps, height, width, all_joints, sigma, stride):
     # background
     heatmap[:, :, -1] = np.clip(1.0 - np.amax(heatmap, axis=2), 0.0, 1.0)
 
-    return heatmap.astype(np.float16)
+    return heatmap
 
 
 def create_paf(num_maps, height, width, all_joints, threshold, stride):
@@ -48,27 +48,24 @@ def create_paf(num_maps, height, width, all_joints, threshold, stride):
             relate to the original image size
     :return: paf maps (height x width x 2*num_maps)
     """
-    vectormap = np.zeros((height, width, num_maps*2), dtype=np.float32)
-    countmap = np.zeros((height, width, num_maps), dtype=np.int16)
+    vectormap = np.zeros((height, width, num_maps*2), dtype=np.float64)
+    countmap = np.zeros((height, width, num_maps), dtype=np.uint8)
     for joints in all_joints:
         for plane_idx, (j_idx1, j_idx2) in enumerate(JointsLoader.joint_pairs):
             center_from = joints[j_idx1]
             center_to = joints[j_idx2]
 
-            if not center_from or not center_to:
+            # skip if no valid pair of keypoints
+            if center_from is None or center_to is None:
                 continue
 
-            _put_paf_on_plane(vectormap, countmap, plane_idx, center_from,
-                              center_to, threshold, height, width, stride)
+            x1, y1 = (center_from[0] / stride, center_from[1] / stride)
+            x2, y2 = (center_to[0] / stride, center_to[1] / stride)
 
-    nonzeros = np.nonzero(countmap)
-    for y, x, p in zip(nonzeros[0], nonzeros[1], nonzeros[2]):
-        if countmap[y][x][p] <= 0:
-            continue
-        vectormap[y][x][p*2+0] /= countmap[y][x][p]
-        vectormap[y][x][p*2+1] /= countmap[y][x][p]
+            _put_paf_on_plane(vectormap, countmap, plane_idx, x1, y1, x2, y2,
+                              threshold, height, width)
 
-    return vectormap.astype(np.float16)
+    return vectormap
 
 
 def _put_heatmap_on_plane(heatmap, plane_idx, joint, sigma, height, width, stride):
@@ -90,19 +87,17 @@ def _put_heatmap_on_plane(heatmap, plane_idx, joint, sigma, height, width, strid
                 heatmap[g_y, g_x, plane_idx] = 1.0
 
 
-def _put_paf_on_plane(vectormap, countmap, plane_idx, center_from, center_to,
-                     threshold, height, width, stride):
-    center_from = (center_from[0] // stride, center_from[1] // stride)
-    center_to = (center_to[0] // stride, center_to[1] // stride)
+def _put_paf_on_plane(vectormap, countmap, plane_idx, x1, y1, x2, y2,
+                     threshold, height, width):
 
-    vec_x = center_to[0] - center_from[0]
-    vec_y = center_to[1] - center_from[1]
+    min_x = max(0, int(round(min(x1, x2) - threshold)))
+    max_x = min(width, int(round(max(x1, x2) + threshold)))
 
-    min_x = max(0, int(min(center_from[0], center_to[0]) - threshold))
-    min_y = max(0, int(min(center_from[1], center_to[1]) - threshold))
+    min_y = max(0, int(round(min(y1, y2) - threshold)))
+    max_y = min(height, int(round(max(y1, y2) + threshold)))
 
-    max_x = min(width, int(max(center_from[0], center_to[0]) + threshold))
-    max_y = min(height, int(max(center_from[1], center_to[1]) + threshold))
+    vec_x = x2 - x1
+    vec_y = y2 - y1
 
     norm = math.sqrt(vec_x ** 2 + vec_y ** 2)
     if norm < 1e-8:
@@ -113,14 +108,20 @@ def _put_paf_on_plane(vectormap, countmap, plane_idx, center_from, center_to,
 
     for y in range(min_y, max_y):
         for x in range(min_x, max_x):
-            bec_x = x - center_from[0]
-            bec_y = y - center_from[1]
+            bec_x = x - x1
+            bec_y = y - y1
             dist = abs(bec_x * vec_y - bec_y * vec_x)
 
             if dist > threshold:
                 continue
 
-            countmap[y][x][plane_idx] += 1
+            cnt = countmap[y][x][plane_idx]
 
-            vectormap[y][x][plane_idx*2+0] = vec_x
-            vectormap[y][x][plane_idx*2+1] = vec_y
+            if cnt == 0:
+                vectormap[y][x][plane_idx * 2 + 0] = vec_x
+                vectormap[y][x][plane_idx * 2 + 1] = vec_y
+            else:
+                vectormap[y][x][plane_idx*2+0] = (vectormap[y][x][plane_idx*2+0] * cnt + vec_x) / (cnt + 1)
+                vectormap[y][x][plane_idx*2+1] = (vectormap[y][x][plane_idx*2+1] * cnt + vec_y) / (cnt + 1)
+
+            countmap[y][x][plane_idx] += 1

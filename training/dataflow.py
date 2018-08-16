@@ -38,11 +38,13 @@ class JointsLoader:
         [8, 9, 10, 11, 12, 13, 2, 3, 4, 16, 5, 6, 7, 17, 0, 14, 15, 16, 17]))
 
     @staticmethod
-    def from_coco_keypoints(all_keypoints):
+    def from_coco_keypoints(all_keypoints, w ,h):
         """
         Creates list of joints based on the list of coco keypoints vectors.
 
         :param all_keypoints: list of coco keypoints vector [[x1,y1,v1,x2,y2,v2,....], []]
+        :param w: image width
+        :param h: image height
         :return: list of joints [[(x1,y1), (x1,y1), ...], [], []]
         """
         all_joints = []
@@ -56,8 +58,8 @@ class JointsLoader:
 
             keypoints_list = []
             for idx, (x, y, v) in enumerate(zip(xs, ys, vs)):
-                # only visible keypoints are used
-                if v > 1:
+                # only visible and occluded keypoints are used
+                if v >= 1 and x >=0 and y >= 0 and x < w and y < h:
                     keypoints_list.append((x, y))
                 else:
                     keypoints_list.append(None)
@@ -96,9 +98,11 @@ class Meta(object):
         'num_keypoints',
         'masks_segments',
         'scale',
+        'all_joints',
         'img',
         'mask',
-        'all_joints')
+        'aug_center',
+        'aug_joints')
 
     def __init__(self, img_path, height, width, center, bbox,
                  area, scale, num_keypoints):
@@ -112,10 +116,15 @@ class Meta(object):
         self.scale = scale
         self.num_keypoints = num_keypoints
 
+        # updated after iterating over all persons
         self.masks_segments = None
         self.all_joints = None
+
+        # updated during augmentation
         self.img = None
         self.mask = None
+        self.aug_center = None
+        self.aug_joints = None
 
 
 class CocoDataFlow(RNGDataFlow):
@@ -224,7 +233,7 @@ class CocoDataFlow(RNGDataFlow):
 
             for person in persons:
                 person.masks_segments = masks
-                person.all_joints = JointsLoader.from_coco_keypoints(keypoints)
+                person.all_joints = JointsLoader.from_coco_keypoints(keypoints, w, h)
                 self.all_meta.append(person)
 
             if i % 1000 == 0:

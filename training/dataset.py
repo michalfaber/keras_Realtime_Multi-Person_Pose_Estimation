@@ -15,10 +15,10 @@ from training.label_maps import create_heatmap, create_paf
 
 
 ALL_PAF_MASK = np.repeat(
-    np.ones((46, 46, 1), dtype=np.ubyte), 38, axis=2)
+    np.ones((46, 46, 1), dtype=np.uint8), 38, axis=2)
 
 ALL_HEATMAP_MASK = np.repeat(
-    np.ones((46, 46, 1), dtype=np.ubyte), 19, axis=2)
+    np.ones((46, 46, 1), dtype=np.uint8), 19, axis=2)
 
 AUGMENTORS_LIST = [
         ScaleAug(scale_min=0.5,
@@ -29,10 +29,10 @@ AUGMENTORS_LIST = [
         RotateAug(rotate_max_deg=40,
                   interp=cv2.INTER_CUBIC,
                   border=cv2.BORDER_CONSTANT,
-                  border_value=(128, 128, 128), mask_border_val=0),
+                  border_value=(128, 128, 128), mask_border_val=1),
 
         CropAug(368, 368, center_perterb_max=40, border_value=(128, 128, 128),
-                mask_border_val=0),
+                 mask_border_val=1),
 
         FlipAug(num_parts=18, prob=0.5),
     ]
@@ -88,29 +88,32 @@ def augment(components):
     """
     meta = components[0]
 
+    aug_center = meta.center.copy()
+    aug_joints = joints_to_point8(meta.all_joints)
+
     for aug in AUGMENTORS_LIST:
         (im, mask), params = aug.augment_return_params(
             AugImgMetadata(img=meta.img,
                             mask=meta.mask,
-                            center=meta.center,
+                            center=aug_center,
                             scale=meta.scale))
 
         # augment joints
-        points = joints_to_point8(meta.all_joints)
-        points = aug.augment_coords(points, params)
+        aug_joints = aug.augment_coords(aug_joints, params)
 
         # after flipping horizontaly the left side joints and right side joints are also
         # flipped so we need to recover their orginal orientation.
         if isinstance(aug, FlipAug):
-            points = aug.recover_left_right(points, params)
+            aug_joints = aug.recover_left_right(aug_joints, params)
 
         # augment center position
-        new_center = aug.augment_coords(meta.center, params)
+        aug_center = aug.augment_coords(aug_center, params)
 
-        meta.all_joints = point8_to_joints(points)
-        meta.center = new_center
         meta.img = im
         meta.mask = mask
+
+    meta.aug_joints = point8_to_joints(aug_joints)
+    meta.aug_center = aug_center
 
     return components
 
@@ -141,7 +144,7 @@ def create_all_mask(mask, num, stride):
     :return:
     """
     scale_factor = 1.0 / stride
-    small_mask = cv2.resize(mask, (0, 0), fx=scale_factor, fy=scale_factor)
+    small_mask = cv2.resize(mask, (0, 0), fx=scale_factor, fy=scale_factor, interpolation=cv2.INTER_CUBIC)
     small_mask = small_mask[:, :, np.newaxis]
     return np.repeat(small_mask, num, axis=2)
 
@@ -154,7 +157,7 @@ def build_sample(components):
     :return: list of final components of a sample.
     """
     meta = components[0]
-    image = meta.img.astype(np.float16)
+    image = meta.img
 
     if meta.mask is None:
         mask_paf = ALL_PAF_MASK
@@ -164,15 +167,17 @@ def build_sample(components):
         mask_heatmap = create_all_mask(meta.mask, 19, stride=8)
 
     heatmap = create_heatmap(JointsLoader.num_joints_and_bkg, 46, 46,
-                                 meta.all_joints, 7.0, stride=8)
+                             meta.aug_joints, 7.0, stride=8)
 
     pafmap = create_paf(JointsLoader.num_connections, 46, 46,
-                           meta.all_joints, 1, stride=8)
+                        meta.aug_joints, 1, stride=8)
 
-    # release reference to the image/mask. Otherwise it would easily consume all memory at some point
+    # release reference to the image/mask/augmented data. Otherwise it would easily consume all memory at some point
     meta.mask = None
     meta.img = None
-    return [image, mask_paf, mask_heatmap, pafmap, heatmap]
+    meta.aug_joints = None
+    meta.aug_center = None
+    return [image.astype(np.uint8), mask_paf, mask_heatmap, pafmap, heatmap]
 
 
 def get_dataflow(annot_path, img_dir):

@@ -1,10 +1,14 @@
 import os
+import sys
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
 from tensorpack.dataflow.common import MapData
 from tensorpack.dataflow.parallel import PrefetchData
+
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+
 from training.dataflow import CocoDataFlow, JointsLoader
 from training.dataset import read_img, gen_mask, augment, apply_mask, \
     create_all_mask, ALL_HEATMAP_MASK, ALL_PAF_MASK
@@ -64,32 +68,6 @@ def display_image(img, heatmap, vectmap):
 
     plt.show()
 
-
-def display_comp_maps(img, title1, title2, map1, map2):
-    """
-    Displays comparision of two maps calculated with different methods.
-
-    :param img:
-    :param title1:
-    :param title2:
-    :param map1:
-    :param map2:
-    :return:
-    """
-    fig = plt.figure()
-    a = fig.add_subplot(1, 2, 1)
-    a.set_title(title1)
-    plt.imshow(img)
-    plt.imshow(map1, alpha=.5)
-
-    a = fig.add_subplot(1, 2, 2)
-    a.set_title(title2)
-    plt.imshow(img)
-    plt.imshow(map2, alpha=.5)
-
-    plt.show()
-
-
 def display_masks(center, img, mask):
     """
     Displays mask for a given image and marks the center of a main person.
@@ -120,38 +98,10 @@ def display_masks(center, img, mask):
     plt.show()
 
 
-def show_comparision_of_2_pafs(g, component1_index, component2_index, paf_idx):
-    img = g[0].img
-    paf1 = g[component1_index].astype(np.float32)
-    paf2 = g[component2_index].astype(np.float32)
-
-    paf1 = paf1[:, :, paf_idx]
-    paf1 = cv2.resize(paf1, (0, 0), fx=8, fy=8, interpolation=cv2.INTER_CUBIC)
-
-    paf2 = paf2[:, :, paf_idx]
-    paf2 = cv2.resize(paf2, (0, 0), fx=8, fy=8, interpolation=cv2.INTER_CUBIC)
-
-    display_comp_maps(img, "PAF1", "PAF2", paf1, paf2)
-
-
-def show_comparision_of_2_heatmaps(g, component1_index, component2_index, heatmap_idx):
-    img = g[0].img
-    heatmap1 = g[component1_index].astype(np.float32)
-    heatmap2 = g[component2_index].astype(np.float32)
-
-    heatmap1 = heatmap1[:, :, heatmap_idx]
-    heatmap1 = cv2.resize(heatmap1, (0, 0), fx=8, fy=8, interpolation=cv2.INTER_CUBIC)
-
-    heatmap2 = heatmap2[:, :, heatmap_idx]
-    heatmap2 = cv2.resize(heatmap2, (0, 0), fx=8, fy=8, interpolation=cv2.INTER_CUBIC)
-
-    display_comp_maps(img, "Heatmap 1", "Heatmap 2", heatmap1, heatmap2)
-
-
 def show_image_mask_center_of_main_person(g):
     img = g[0].img
     mask = g[0].mask
-    center = g[0].center
+    center = g[0].aug_center
     display_masks(center, img, mask)
 
 
@@ -181,10 +131,10 @@ def build_debug_sample(components):
         mask_heatmap = create_all_mask(meta.mask, 19, stride=8)
 
     heatmap = create_heatmap(JointsLoader.num_joints_and_bkg, 46, 46,
-                                 meta.all_joints, 7.0, stride=8)
+                                 meta.aug_joints, 7.0, stride=8)
 
     pafmap = create_paf(JointsLoader.num_connections, 46, 46,
-                           meta.all_joints, 1, stride=8)
+                           meta.aug_joints, 1, stride=8)
 
     return [meta, mask_paf, mask_heatmap, pafmap, heatmap]
 
@@ -208,6 +158,4 @@ if __name__ == '__main__':
 
     for g in gen:
         show_image_mask_center_of_main_person(g)
-        #show_comparision_of_2_pafs(g, 3, 3, 2)
-        #show_comparision_of_2_heatmaps(g, 4, 4, 2)
         #show_image_heatmap_paf(g)

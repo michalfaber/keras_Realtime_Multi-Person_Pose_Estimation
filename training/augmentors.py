@@ -39,8 +39,8 @@ def joints_to_point8(joints, num_p=18):
                 segment[idx_all * num_p + idx, 0] = k[0]
                 segment[idx_all * num_p + idx, 1] = k[1]
             else:
-                segment[idx_all * num_p + idx, 0] = -10000
-                segment[idx_all * num_p + idx, 1] = -10000
+                segment[idx_all * num_p + idx, 0] = -1000000
+                segment[idx_all * num_p + idx, 1] = -1000000
 
     return segment
 
@@ -63,7 +63,7 @@ def point8_to_joints(points, num_p=18):
             x = points[idx, 0]
             y = points[idx, 1]
 
-            if x <= 0 or y <= 0 or x > 5000 or y > 5000:
+            if x <= 0 or y <= 0 or x > 2000 or y > 2000:
                 skel.append(None)
             else:
                 skel.append((x, y))
