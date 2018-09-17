@@ -1,6 +1,7 @@
-from model import get_testing_model
-import numpy as np
 import os
+import numpy as np
+
+from model.cmu_model import get_testing_model
 
 CAFFE_LAYERS_DIR = "model/caffe/layers"
 KERAS_MODEL_FILE = "model/keras/model.h5"

@@ -9,8 +9,6 @@ import util
 from config_reader import config_reader
 from scipy.ndimage.filters import gaussian_filter
 
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-
 from model.cmu_model import get_testing_model
 
 
