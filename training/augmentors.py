@@ -135,9 +135,9 @@ class FlipAug(ImageAugmentor):
             for l_idx, r_idx in zip(left, right):
                 idxs = range(0, coords.shape[0], self.num_parts)
                 for idx in idxs:
-                    tmp = coords[l_idx + idx, 0]
-                    coords[l_idx + idx, 0] = coords[r_idx + idx, 0]
-                    coords[r_idx + idx, 0] = tmp
+                    tmp = coords[l_idx + idx, [0, 1]]
+                    coords[l_idx + idx, [0, 1]] = coords[r_idx + idx, [0, 1]]
+                    coords[r_idx + idx, [0, 1]] = tmp
 
         return coords
 
