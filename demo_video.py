@@ -36,10 +36,8 @@ colors = [[255, 0, 0], [255, 85, 0], [255, 170, 0], [255, 255, 0], [170, 255, 0]
 
 def process (input_image, params, model_params):
 
-    #oriImg = cv2.imread(input_image)  # B,G,R order
     oriImg = cv2.cvtColor(input_image, cv2.COLOR_RGB2BGR)
 
-    #scale_search = params['scale_search']
     scale_search = [1, .5, 1.5, 2] # [.5, 1, 1.5, 2]
     scale_search = scale_search[0:process_speed]
 
@@ -213,7 +211,6 @@ def process (input_image, params, model_params):
             deleteIdx.append(i)
     subset = np.delete(subset, deleteIdx, axis=0)
 
-    #canvas = cv2.imread(input_image)  # B,G,R order
     canvas = input_image
 
     for i in range(18):
@@ -248,16 +245,13 @@ if __name__ == '__main__':
     parser.add_argument('--model', type=str, default='model/keras/model.h5', help='path to the weights file')
     parser.add_argument('--frame_ratio', type=int, default=1, help='analyze every [n] frames')
     parser.add_argument('--process_speed', type=int, default=4, help='Int 1 (fastest, lowest quality) to 4 (slowest, highest quality)')
-    #parser.add_argument('--start', type=int, default=0, help='Video frame to start with')
     parser.add_argument('--end', type=int, default=None, help='Last video frame to analyze')
 
     args = parser.parse_args()
-    #input_image = args.image
-    #output = args.output
+
     keras_weights_file = args.model
     frame_rate_ratio = args.frame_ratio
     process_speed = args.process_speed
-    #starting_frame = args.start
     ending_frame = args.end
 
     print('start processing...')
