@@ -9,7 +9,7 @@ from tensorpack.dataflow.parallel import PrefetchData
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from training.dataflow import CocoDataFlow, JointsLoader
+from training.dataflow import CocoDataFlow, JointsLoader, COCODataPaths
 from training.dataset import read_img, gen_mask, augment, apply_mask, \
     create_all_mask, ALL_HEATMAP_MASK, ALL_PAF_MASK
 from training.label_maps import create_heatmap, create_paf
@@ -68,6 +68,7 @@ def display_image(img, heatmap, vectmap):
 
     plt.show()
 
+
 def display_masks(center, img, mask):
     """
     Displays mask for a given image and marks the center of a main person.
@@ -99,6 +100,11 @@ def display_masks(center, img, mask):
 
 
 def show_image_mask_center_of_main_person(g):
+    """
+    Displays window with image,mask and center point of main person
+
+    :param g: generated sample
+    """
     img = g[0].img
     mask = g[0].mask
     center = g[0].aug_center
@@ -106,6 +112,11 @@ def show_image_mask_center_of_main_person(g):
 
 
 def show_image_heatmap_paf(g):
+    """
+    Displays window with image, heatmap and paf
+
+    :param g: generated sample
+    """
     img = g[0].img
     paf = g[3].astype(np.float32)
     heatmap = g[4].astype(np.float32)
@@ -144,7 +155,8 @@ if __name__ == '__main__':
     curr_dir = os.path.dirname(__file__)
     annot_path = os.path.join(curr_dir, '../dataset/annotations/person_keypoints_val2017.json')
     img_dir = os.path.abspath(os.path.join(curr_dir, '../dataset/val2017/'))
-    df = CocoDataFlow((368, 368), annot_path, img_dir)#, select_ids=[1000])
+    df = CocoDataFlow((368, 368),
+                      COCODataPaths(annot_path, img_dir))#, select_ids=[1000])
     df.prepare()
     df = MapData(df, read_img)
     df = MapData(df, gen_mask)

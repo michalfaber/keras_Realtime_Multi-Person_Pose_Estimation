@@ -10,7 +10,7 @@ from tensorpack.dataflow.parallel import PrefetchDataZMQ
 
 from training.augmentors import ScaleAug, RotateAug, CropAug, FlipAug, \
     joints_to_point8, point8_to_joints, AugImgMetadata
-from training.dataflow import CocoDataFlow, JointsLoader
+from training.dataflow import CocoDataFlow, JointsLoader, COCODataPaths
 from training.label_maps import create_heatmap, create_paf
 
 
@@ -180,16 +180,15 @@ def build_sample(components):
     return [image.astype(np.uint8), mask_paf, mask_heatmap, pafmap, heatmap]
 
 
-def get_dataflow(annot_path, img_dir):
+def get_dataflow(coco_data_paths):
     """
     This function initializes the tensorpack dataflow and serves generator
     for training operation.
 
-    :param annot_path: path to the annotation file
-    :param img_dir: path to the images
+    :param coco_data_paths: paths to the coco files: annotation file and folder with images
     :return: dataflow object
     """
-    df = CocoDataFlow((368, 368), annot_path, img_dir)
+    df = CocoDataFlow((368, 368), coco_data_paths)
     df.prepare()
     df = MapData(df, read_img)
     df = MapData(df, gen_mask)
@@ -228,7 +227,7 @@ if __name__ == '__main__':
     curr_dir = os.path.dirname(__file__)
     annot_path = os.path.join(curr_dir, '../dataset/annotations/person_keypoints_val2017.json')
     img_dir = os.path.abspath(os.path.join(curr_dir, '../dataset/val2017/'))
-    df = CocoDataFlow((368, 368), annot_path, img_dir)#, select_ids=[1000])
+    df = CocoDataFlow((368, 368), COCODataPaths(annot_path, img_dir))#, select_ids=[1000])
     df.prepare()
     df = MapData(df, read_img)
     df = MapData(df, gen_mask)

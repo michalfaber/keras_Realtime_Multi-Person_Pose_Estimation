@@ -127,21 +127,28 @@ class Meta(object):
         self.aug_joints = None
 
 
+class COCODataPaths:
+    """
+    Holder for coco dataset paths
+    """
+    def __init__(self, annot_path, img_dir):
+        self.annot = COCO(annot_path)
+        self.img_dir = img_dir
+
+
 class CocoDataFlow(RNGDataFlow):
     """
     Tensorpack dataflow serving coco data points.
     """
-    def __init__(self, target_size, annot_path, img_dir, select_ids=None):
+    def __init__(self, target_size, coco_data, select_ids=None):
         """
         Initializes dataflow.
 
         :param target_size:
-        :param annot_path: path to the coco annotation file
-        :param img_dir: directory containing images
+        :param coco_data: paths to the coco files: annotation file and folder with images
         :param select_ids: (optional) identifiers of images to serve (for debugging)
         """
-        self.img_dir = img_dir
-        self.coco = COCO(annot_path)
+        self.coco_data = coco_data if isinstance(coco_data, list) else [coco_data]
         self.all_meta = []
         self.select_ids = select_ids
         self.target_size = target_size
@@ -152,92 +159,97 @@ class CocoDataFlow(RNGDataFlow):
         scale of main person, bounding box, area, joints) Remaining fields
         are populated in next steps - MapData tensorpack tranformer.
         """
-        if self.select_ids:
-            ids = self.select_ids
-        else:
-            ids = list(self.coco.imgs.keys())
+        for coco in self.coco_data:
 
-        for i, img_id in enumerate(ids):
-            img_meta = self.coco.imgs[img_id]
+            print("Loading dataset {} ...".format(coco.img_dir))
 
-            # load annotations
+            if self.select_ids:
+                ids = self.select_ids
+            else:
+                ids = list(coco.annot.imgs.keys())
 
-            img_id = img_meta['id']
-            img_file = img_meta['file_name']
-            h, w = img_meta['height'], img_meta['width']
-            img_path = os.path.join(self.img_dir, img_file)
-            ann_ids = self.coco.getAnnIds(imgIds=img_id)
-            anns = self.coco.loadAnns(ann_ids)
+            for i, img_id in enumerate(ids):
+                img_meta = coco.annot.imgs[img_id]
 
-            total_keypoints = sum([ann.get('num_keypoints', 0) for ann in anns])
-            if total_keypoints == 0:
-                continue
+                # load annotations
 
-            persons = []
-            prev_center = []
-            masks = []
-            keypoints = []
+                img_id = img_meta['id']
+                img_file = img_meta['file_name']
+                h, w = img_meta['height'], img_meta['width']
+                img_path = os.path.join(coco.img_dir, img_file)
+                ann_ids = coco.annot.getAnnIds(imgIds=img_id)
+                anns = coco.annot.loadAnns(ann_ids)
 
-            # sort from the biggest person to the smallest one
-
-            persons_ids = np.argsort([-a['area'] for a in anns], kind='mergesort')
-
-            for id in list(persons_ids):
-                person_meta = anns[id]
-
-                if person_meta["iscrowd"]:
-                    masks.append(self.coco.annToRLE(person_meta))
+                total_keypoints = sum([ann.get('num_keypoints', 0) for ann in anns])
+                if total_keypoints == 0:
                     continue
 
-                # skip this person if parts number is too low or if
-                # segmentation area is too small
+                persons = []
+                prev_center = []
+                masks = []
+                keypoints = []
 
-                if person_meta["num_keypoints"] < 5 or person_meta["area"] < 32 * 32:
-                    masks.append(self.coco.annToRLE(person_meta))
-                    continue
+                # sort from the biggest person to the smallest one
 
-                person_center = [person_meta["bbox"][0] + person_meta["bbox"][2] / 2,
-                                 person_meta["bbox"][1] + person_meta["bbox"][3] / 2]
+                persons_ids = np.argsort([-a['area'] for a in anns], kind='mergesort')
 
-                # skip this person if the distance to existing person is too small
+                for id in list(persons_ids):
+                    person_meta = anns[id]
 
-                too_close = False
-                for pc in prev_center:
-                    a = np.expand_dims(pc[:2], axis=0)
-                    b = np.expand_dims(person_center, axis=0)
-                    dist = cdist(a, b)[0]
-                    if dist < pc[2]*0.3:
-                        too_close = True
-                        break
+                    if person_meta["iscrowd"]:
+                        masks.append(coco.annot.annToRLE(person_meta))
+                        continue
 
-                if too_close:
-                    # add mask of this person. we don't want to show the network
-                    # unlabeled people
-                    masks.append(self.coco.annToRLE(person_meta))
-                    continue
+                    # skip this person if parts number is too low or if
+                    # segmentation area is too small
 
-                pers = Meta(
-                    img_path=img_path,
-                    height=h,
-                    width=w,
-                    center=np.expand_dims(person_center, axis=0),
-                    bbox=person_meta["bbox"],
-                    area=person_meta["area"],
-                    scale=person_meta["bbox"][3] / self.target_size[0],
-                    num_keypoints=person_meta["num_keypoints"])
+                    if person_meta["num_keypoints"] < 5 or person_meta["area"] < 32 * 32:
+                        masks.append(coco.annot.annToRLE(person_meta))
+                        continue
 
-                keypoints.append(person_meta["keypoints"])
-                persons.append(pers)
-                prev_center.append(np.append(person_center, max(person_meta["bbox"][2],
-                                                                person_meta["bbox"][3])))
+                    person_center = [person_meta["bbox"][0] + person_meta["bbox"][2] / 2,
+                                     person_meta["bbox"][1] + person_meta["bbox"][3] / 2]
 
-            for person in persons:
-                person.masks_segments = masks
-                person.all_joints = JointsLoader.from_coco_keypoints(keypoints, w, h)
-                self.all_meta.append(person)
+                    # skip this person if the distance to existing person is too small
 
-            if i % 1000 == 0:
-                print("Loading image annot {}/{}".format(i, len(ids)))
+                    too_close = False
+                    for pc in prev_center:
+                        a = np.expand_dims(pc[:2], axis=0)
+                        b = np.expand_dims(person_center, axis=0)
+                        dist = cdist(a, b)[0]
+                        if dist < pc[2]*0.3:
+                            too_close = True
+                            break
+
+                    if too_close:
+                        # add mask of this person. we don't want to show the network
+                        # unlabeled people
+                        masks.append(coco.annot.annToRLE(person_meta))
+                        continue
+
+                    pers = Meta(
+                        img_path=img_path,
+                        height=h,
+                        width=w,
+                        center=np.expand_dims(person_center, axis=0),
+                        bbox=person_meta["bbox"],
+                        area=person_meta["area"],
+                        scale=person_meta["bbox"][3] / self.target_size[0],
+                        num_keypoints=person_meta["num_keypoints"])
+
+                    keypoints.append(person_meta["keypoints"])
+                    persons.append(pers)
+                    prev_center.append(np.append(person_center, max(person_meta["bbox"][2],
+                                                                    person_meta["bbox"][3])))
+
+                if len(persons) > 0:
+                    main_person = persons[0]
+                    main_person.masks_segments = masks
+                    main_person.all_joints = JointsLoader.from_coco_keypoints(keypoints, w, h)
+                    self.all_meta.append(main_person)
+
+                if i % 1000 == 0:
+                    print("Loading image annot {}/{}".format(i, len(ids)))
 
     def save(self, path):
         raise NotImplemented

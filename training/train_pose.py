@@ -15,6 +15,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from model.cmu_model import get_training_model
 from training.optimizers import MultiSGD
 from training.dataset import get_dataflow, batch_dataflow
+from training.dataflow import COCODataPaths
 
 
 batch_size = 10
@@ -184,14 +185,22 @@ if __name__ == '__main__':
     # prepare generators
 
     curr_dir = os.path.dirname(__file__)
-    annot_path = os.path.join(curr_dir, '../dataset/annotations/person_keypoints_train2017.json')
-    img_dir = os.path.abspath(os.path.join(curr_dir, '../dataset/train2017/'))
+    annot_path_train = os.path.join(curr_dir, '../dataset/annotations/person_keypoints_train2017.json')
+    img_dir_train = os.path.abspath(os.path.join(curr_dir, '../dataset/train2017/'))
+    annot_path_val = os.path.join(curr_dir, '../dataset/annotations/person_keypoints_val2017.json')
+    img_dir_val = os.path.abspath(os.path.join(curr_dir, '../dataset/val2017/'))
 
-    # get dataflow of samples
+    # get dataflow of samples from training set and validation set (we use validation set for training as well)
 
-    df = get_dataflow(
-        annot_path=annot_path,
-        img_dir=img_dir)
+    coco_data_train = COCODataPaths(
+        annot_path=annot_path_train,
+        img_dir=img_dir_train
+    )
+    coco_data_val = COCODataPaths(
+        annot_path=annot_path_val,
+        img_dir=img_dir_val
+    )
+    df = get_dataflow([coco_data_train, coco_data_val])
     train_samples = df.size()
 
     # get generator of batches
@@ -232,7 +241,5 @@ if __name__ == '__main__':
                         steps_per_epoch=train_samples // batch_size,
                         epochs=max_iter,
                         callbacks=callbacks_list,
-                        # validation_data=val_di,
-                        # validation_steps=val_samples // batch_size,
                         use_multiprocessing=False,
                         initial_epoch=last_epoch)
