@@ -273,6 +273,7 @@ def process (input_image, params, model_params):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     #parser.add_argument('--video', type=str, required=True, help='input video file name')
+    parser.add_argument('--device', type=int, default=0, help='ID of the device to open')
     parser.add_argument('--model', type=str, default='model/keras/model.h5', help='path to the weights file')
     parser.add_argument('--frame_ratio', type=int, default=7, help='analyze every [n] frames')
     # --process_speed changes at how many times the model analyzes each frame at a different scale
@@ -283,6 +284,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     #input_image = args.image
     #output = args.output
+    device = args.device
     keras_weights_file = args.model
     frame_rate_ratio = args.frame_ratio
     process_speed = args.process_speed
@@ -312,7 +314,7 @@ if __name__ == '__main__':
 
     # Video reader
     #cam = cv2.VideoCapture(video_file)
-    cam = cv2.VideoCapture(0)
+    cam = cv2.VideoCapture(device)
     #CV_CAP_PROP_FPS
     #cam.set(cv2.CAP_PROP_FPS, 10)
     #cam.set(cv2.CAP_PROP_FPS, 10)
