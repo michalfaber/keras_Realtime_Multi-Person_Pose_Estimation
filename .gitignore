@@ -9,9 +9,11 @@ dataset/valmask2017
 dataset/*.h5
 dataset/annotations
 dataset/coco
+videos/outputs
 .idea
 __pycache__
 .ipynb_checkpoints
 logs/
 training.csv
 weights.best.h5
+*.png
