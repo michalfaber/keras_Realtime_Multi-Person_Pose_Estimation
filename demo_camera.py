@@ -15,6 +15,10 @@ currentDT = time.localtime()
 start_datetime = time.strftime("-%m-%d-%H-%M-%S", currentDT)
 
 
+def crop(image, w, f):
+    return image[:, int(w * f): int(w * (1 - f))]
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--device', type=int, default=0, help='ID of the device to open')
@@ -53,6 +57,10 @@ if __name__ == '__main__':
 
     ret_val, orig_image = cam.read()
 
+    width = orig_image.shape[1]
+    height = orig_image.shape[0]
+    factor = 0.3
+
     out = None
     # Output location
     if out_name is not None and ret_val is not None:
@@ -63,8 +71,12 @@ if __name__ == '__main__':
         # Video writer
         output_fps = input_fps / frame_rate_ratio
 
+        tmp = crop(orig_image, width, factor)
+
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter(video_output, fourcc, output_fps, (orig_image.shape[1], orig_image.shape[0]))
+        out = cv2.VideoWriter(video_output, fourcc, output_fps, (tmp.shape[1], tmp.shape[0]))
+
+        del tmp
 
     scale_search = [0.22, 0.25, .5, 1, 1.5, 2]  # [.5, 1, 1.5, 2]
     scale_search = scale_search[0:process_speed]
@@ -86,17 +98,13 @@ if __name__ == '__main__':
 
         tic = time.time()
 
-        width = orig_image.shape[1]
-        height = orig_image.shape[0]
-        factor = 0.3
+        cropped = crop(orig_image, width, factor)
 
-        cropped = orig_image[:, int(width*factor):int(width*(1-factor))]
-
-        # generate image with body parts
         input_image = cv2.resize(cropped, (0, 0), fx=1/resize_fac, fy=1/resize_fac, interpolation=cv2.INTER_CUBIC)
 
         input_image = cv2.cvtColor(input_image, cv2.COLOR_RGB2BGR)
 
+        # generate image with body parts
         all_peaks, subset, candidate = extract_parts(input_image, params, model, model_params)
         canvas = draw(cropped, all_peaks, subset, candidate, resize_fac=resize_fac)
 
