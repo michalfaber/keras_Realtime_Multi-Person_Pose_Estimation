@@ -6,6 +6,14 @@ import cv2
 
 import util
 
+COCO_BODY_PARTS = ['nose', 'neck',
+                   'right_shoulder', ' right_elbow', 'right_wrist',
+                   'left_shoulder', 'left_elbow', 'left_wrist',
+                   'right_hip', 'right_knee', 'right_ankle',
+                   'left_hip', 'left_knee', 'left_ankle',
+                   'right_eye', 'left_eye', 'right_ear', 'left_ear', 'background'
+                   ]
+
 
 def extract_parts(input_image, params, model, model_params):
     multiplier = [x * model_params['boxsize'] / input_image.shape[0] for x in params['scale_search']]
@@ -178,8 +186,14 @@ def extract_parts(input_image, params, model, model_params):
         if subset[i][-1] < 4 or subset[i][-2] / subset[i][-1] < 0.4:
             delete_idx.append(i)
     subset = np.delete(subset, delete_idx, axis=0)
-
-    return all_peaks, subset, candidate
+    points = []
+    for peak in all_peaks:
+        try:
+            points.append((peak[0][:2]))
+        except IndexError:
+            points.append((None, None))
+    body_parts = dict(zip(COCO_BODY_PARTS, points))
+    return body_parts, all_peaks, subset, candidate
 
 
 def draw(input_image, all_peaks, subset, candidate, resize_fac=1):
