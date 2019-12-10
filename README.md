@@ -1,4 +1,13 @@
-# Realtime Multi-Person Pose Estimation
+#### This repository has become incompatible with the latest and recommended version of Tensorflow 2.0 Instead of refactoring this code painfully, I created a new fresh repository with some additional features like:
+- #### Training code for smaller model based on MobilenetV2.
+- #### Visualisation of predictions (heatmaps, pafs) in Tensorboard.
+- #### Additional scripts to convert and test models for Tensorflow Lite.
+
+#### Here is the link to the new repo: [tensorflow_Realtime_Multi-Person_Pose_Estimation](https://github.com/michalfaber/tensorflow_Realtime_Multi-Person_Pose_Estimation)
+
+---
+
+# Realtime Multi-Person Pose Estimation (DEPRECATED)
 This is a keras version of [Realtime Multi-Person Pose Estimation](https://github.com/ZheC/Realtime_Multi-Person_Pose_Estimation) project  
 
 ## Introduction
