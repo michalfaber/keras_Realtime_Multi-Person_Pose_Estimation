@@ -34,7 +34,7 @@ if __name__ == '__main__':
     
     input_image = cv2.imread(image_path)  # B,G,R order
     
-    all_peaks, subset, candidate = extract_parts(input_image, params, model, model_params)
+    body_parts, all_peaks, subset, candidate = extract_parts(input_image, params, model, model_params)
     canvas = draw(input_image, all_peaks, subset, candidate)
     
     toc = time.time()

@@ -105,7 +105,7 @@ if __name__ == '__main__':
         input_image = cv2.cvtColor(input_image, cv2.COLOR_RGB2BGR)
 
         # generate image with body parts
-        all_peaks, subset, candidate = extract_parts(input_image, params, model, model_params)
+        body_parts, all_peaks, subset, candidate = extract_parts(input_image, params, model, model_params)
         canvas = draw(cropped, all_peaks, subset, candidate, resize_fac=resize_fac)
 
         print('Processing frame: ', i)

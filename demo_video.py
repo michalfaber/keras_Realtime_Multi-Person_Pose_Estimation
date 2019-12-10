@@ -80,7 +80,7 @@ if __name__ == '__main__':
             tic = time.time()
 
             # generate image with body parts
-            all_peaks, subset, candidate = extract_parts(input_image, params, model, model_params)
+            body_parts, all_peaks, subset, candidate = extract_parts(input_image, params, model, model_params)
             canvas = draw(orig_image, all_peaks, subset, candidate)
 
             print('Processing frame: ', i)
